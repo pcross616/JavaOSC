@@ -9,6 +9,7 @@
 package com.illposed.osc;
 
 import com.illposed.osc.utility.OSCJavaToByteArrayConverter;
+import java.nio.charset.Charset;
 
 /**
  * OSCPacket is the abstract superclass for the various
@@ -27,28 +28,47 @@ import com.illposed.osc.utility.OSCJavaToByteArrayConverter;
  */
 public abstract class OSCPacket {
 
-	private boolean isByteArrayComputed;
+	/** Used to encode message addresses and string parameters. */
+	private Charset charset;
 	private byte[] byteArray;
 
-	/**
-	 * Default constructor for the abstract class
-	 */
 	public OSCPacket() {
+		this.charset = Charset.defaultCharset();
+		this.byteArray = null;
+	}
+
+	/**
+	 * Returns the character set used by this packet.
+	 * @return the character set used to encode message addresses and string
+	 *   arguments.
+	 */
+	public Charset getCharset() {
+		return charset;
+	}
+
+	/**
+	 * Sets the character set used by this packet.
+	 * @param charset used to encode message addresses and string arguments.
+	 */
+	public void setCharset(Charset charset) {
+		this.charset = charset;
 	}
 
 	/**
 	 * Generate a representation of this packet conforming to the
 	 * the OSC byte stream specification. Used Internally.
 	 */
-	protected byte[] computeByteArray() {
+	private byte[] computeByteArray() {
 		OSCJavaToByteArrayConverter stream = new OSCJavaToByteArrayConverter();
+		stream.setCharset(charset);
 		return computeByteArray(stream);
 	}
 
 	/**
-	 * Subclasses should implement this method to product a byte array
-	 * formatted according to the OSC specification.
-	 * @param stream OscPacketByteArrayConverter
+	 * Produces a byte array representation of this packet.
+	 * @param stream where to write the arguments to
+	 * @return the OSC specification conform byte array representation
+	 *   of this packet
 	 */
 	protected abstract byte[] computeByteArray(OSCJavaToByteArrayConverter stream);
 
@@ -57,10 +77,14 @@ public abstract class OSCPacket {
 	 * @return byte[]
 	 */
 	public byte[] getByteArray() {
-		if (!isByteArrayComputed) {
+		if (byteArray == null) {
 			byteArray = computeByteArray();
 		}
 		return byteArray;
+	}
+
+	protected void contentChanged() {
+		byteArray = null;
 	}
 
 	/**

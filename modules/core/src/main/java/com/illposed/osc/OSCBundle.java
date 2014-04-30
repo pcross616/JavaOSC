@@ -8,15 +8,13 @@
 
 package com.illposed.osc;
 
-import java.math.BigInteger;
+import com.illposed.osc.utility.OSCJavaToByteArrayConverter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-
-import com.illposed.osc.utility.OSCJavaToByteArrayConverter;
 
 /**
  * A bundle represents a collection of OSC packets
@@ -37,8 +35,7 @@ public class OSCBundle extends OSCPacket {
 	/**
 	 * 2208988800 seconds -- includes 17 leap years
 	 */
-	public static final BigInteger SECONDS_FROM_1900_TO_1970 =
-		new BigInteger("2208988800");
+	public static final long SECONDS_FROM_1900_TO_1970 = 2208988800L;
 
 	/**
 	 * The Java representation of an OSC timestamp with the semantics of
@@ -62,18 +59,7 @@ public class OSCBundle extends OSCPacket {
 	 * @param timestamp the time to execute the bundle
 	 */
 	public OSCBundle(Date timestamp) {
-		this((Collection<OSCPacket>) null, timestamp);
-	}
-
-	// deprecated since version 1.0, March 2012
-	/**
-	 * Creates an OSCBundle made up of the given packets
-	 * with a timestamp of now.
-	 * @param packets array of OSCPackets to initialize this object with
-	 * @deprecated
-	 */
-	public OSCBundle(OSCPacket[] packets) {
-		this(packets, TIMESTAMP_IMMEDIATE);
+		this(null, timestamp);
 	}
 
 	/**
@@ -83,20 +69,6 @@ public class OSCBundle extends OSCPacket {
 	 */
 	public OSCBundle(Collection<OSCPacket> packets) {
 		this(packets, TIMESTAMP_IMMEDIATE);
-	}
-
-	// deprecated since version 1.0, March 2012
-	/**
-	 * Creates an OSCBundle, specifying the packets and timestamp.
-	 * @param packets the packets that make up the bundle
-	 * @param timestamp the time to execute the bundle
-	 * @deprecated
-	 */
-	public OSCBundle(OSCPacket[] packets, Date timestamp) {
-		this((packets == null)
-				? new LinkedList<OSCPacket>()
-				: Arrays.asList(packets),
-				timestamp);
 	}
 
 	/**
@@ -137,21 +109,21 @@ public class OSCBundle extends OSCPacket {
 	 */
 	public void addPacket(OSCPacket packet) {
 		packets.add(packet);
+		contentChanged();
 	}
 
 	/**
 	 * Get the packets contained in this bundle.
 	 * @return the packets contained in this bundle.
 	 */
-	public OSCPacket[] getPackets() {
-		OSCPacket[] packetArray = new OSCPacket[packets.size()];
-		packets.toArray(packetArray);
-		return packetArray;
+	public List<OSCPacket> getPackets() {
+		return Collections.unmodifiableList(packets);
 	}
 
 	/**
 	 * Convert the time-tag (a Java Date) into the OSC byte stream.
 	 * Used Internally.
+	 * @param stream where to write the time-tag to
 	 */
 	protected void computeTimeTagByteArray(OSCJavaToByteArrayConverter stream) {
 		if ((null == timestamp) || (timestamp == TIMESTAMP_IMMEDIATE)) {
@@ -162,7 +134,7 @@ public class OSCBundle extends OSCPacket {
 
 		long millisecs = timestamp.getTime();
 		long secsSince1970 = (long) (millisecs / 1000);
-		long secs = secsSince1970 + SECONDS_FROM_1900_TO_1970.longValue();
+		long secs = secsSince1970 + SECONDS_FROM_1900_TO_1970;
 
 		// this line was cribbed from jakarta commons-net's NTP TimeStamp code
 		long fraction = ((millisecs % 1000) * 0x100000000L) / 1000;
@@ -171,18 +143,13 @@ public class OSCBundle extends OSCPacket {
 		stream.write((int) fraction);
 	}
 
-	/**
-	 * Compute the OSC byte stream representation of the bundle.
-	 * Used Internally.
-	 * @param stream OscPacketByteArrayConverter
-	 */
+	@Override
 	protected byte[] computeByteArray(OSCJavaToByteArrayConverter stream) {
 		stream.write("#bundle");
 		computeTimeTagByteArray(stream);
 		byte[] packetBytes;
 		for (OSCPacket pkg : packets) {
 			packetBytes = pkg.getByteArray();
-			stream.write(packetBytes.length);
 			stream.write(packetBytes);
 		}
 		return stream.toByteArray();

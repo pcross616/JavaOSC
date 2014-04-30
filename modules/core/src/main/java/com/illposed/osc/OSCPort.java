@@ -19,8 +19,8 @@ import java.net.DatagramSocket;
  */
 public abstract class OSCPort {
 
-	private DatagramSocket socket;
-	private int port;
+	private final DatagramSocket socket;
+	private final int port;
 
 	public static final int DEFAULT_SC_OSC_PORT = 57110;
 	public static final int DEFAULT_SC_LANG_OSC_PORT = 57120;
@@ -33,6 +33,7 @@ public abstract class OSCPort {
 	/**
 	 * The port that the SuperCollider <b>synth</b> engine
 	 * usually listens to.
+	 * @return default SuperCollider <b>synth</b> UDP port
 	 * @see #DEFAULT_SC_OSC_PORT
 	 */
 	public static int defaultSCOSCPort() {
@@ -42,6 +43,7 @@ public abstract class OSCPort {
 	/**
 	 * The port that the SuperCollider <b>language</b> engine
 	 * usually listens to.
+	 * @return default SuperCollider <b>language</b> UDP port
 	 * @see #DEFAULT_SC_LANG_OSC_PORT
 	 */
 	public static int defaultSCLangOSCPort() {
@@ -62,15 +64,6 @@ public abstract class OSCPort {
 	 */
 	protected int getPort() {
 		return port;
-	}
-
-	/**
-	 * Close the socket if this hasn't already happened.
-	 * @see java.lang.Object#finalize()
-	 */
-	protected void finalize() throws Throwable {
-		super.finalize();
-		socket.close();
 	}
 
 	/**

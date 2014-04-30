@@ -8,43 +8,39 @@
 
 package com.illposed.osc.utility;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-
 import com.illposed.osc.OSCBundle;
 import com.illposed.osc.OSCListener;
 import com.illposed.osc.OSCMessage;
 import com.illposed.osc.OSCPacket;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 /**
- * Dispatches OSCMessages to registered listeners.
+ * Dispatches {@link OSCPacket}s to registered listeners (<i>Method</i>s).
  *
  * @author Chandrasekhar Ramakrishnan
  */
-
 public class OSCPacketDispatcher {
 
-	private Map<String, OSCListener> addressToListener
-			= new HashMap<String, OSCListener>();
+	private final Map<AddressSelector, OSCListener> selectorToListener;
 
-	/**
-	 *
-	 */
 	public OSCPacketDispatcher() {
+		this.selectorToListener = new HashMap<AddressSelector, OSCListener>();
 	}
 
-	public void addListener(String address, OSCListener listener) {
-		addressToListener.put(address, listener);
+	/**
+	 * Adds a listener (<i>Method</i> in OSC speak) that will be notified
+	 * of incoming messages that match the selector.
+	 */
+	public void addListener(AddressSelector addressSelector, OSCListener listener) {
+		selectorToListener.put(addressSelector, listener);
 	}
 
 	public void dispatchPacket(OSCPacket packet) {
-		if (packet instanceof OSCBundle) {
-			dispatchBundle((OSCBundle) packet);
-		} else {
-			dispatchMessage((OSCMessage) packet);
-		}
+		dispatchPacket(packet, null);
 	}
 
 	public void dispatchPacket(OSCPacket packet, Date timestamp) {
@@ -57,19 +53,15 @@ public class OSCPacketDispatcher {
 
 	private void dispatchBundle(OSCBundle bundle) {
 		Date timestamp = bundle.getTimestamp();
-		OSCPacket[] packets = bundle.getPackets();
+		List<OSCPacket> packets = bundle.getPackets();
 		for (OSCPacket packet : packets) {
 			dispatchPacket(packet, timestamp);
 		}
 	}
 
-	private void dispatchMessage(OSCMessage message) {
-		dispatchMessage(message, null);
-	}
-
 	private void dispatchMessage(OSCMessage message, Date time) {
-		for (Entry<String, OSCListener> addrList : addressToListener.entrySet()) {
-			if (message.getAddress().matches(addrList.getKey())) {
+		for (Entry<AddressSelector, OSCListener> addrList : selectorToListener.entrySet()) {
+			if (addrList.getKey().matches(message.getAddress())) {
 				addrList.getValue().acceptMessage(time, message);
 			}
 		}

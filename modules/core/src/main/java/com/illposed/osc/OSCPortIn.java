@@ -8,11 +8,15 @@
 
 package com.illposed.osc;
 
-import java.net.*;
-import java.io.IOException;
-
+import com.illposed.osc.utility.AddressSelector;
 import com.illposed.osc.utility.OSCByteArrayToJavaConverter;
 import com.illposed.osc.utility.OSCPacketDispatcher;
+import com.illposed.osc.utility.OSCPatternAddressSelector;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.SocketException;
+import java.nio.charset.Charset;
 
 /**
  * OSCPortIn is the class that listens for OSC messages.
@@ -40,33 +44,49 @@ import com.illposed.osc.utility.OSCPacketDispatcher;
  */
 public class OSCPortIn extends OSCPort implements Runnable {
 
-	// state for listening
+	/** state for listening */
 	private boolean listening;
-	private OSCByteArrayToJavaConverter converter
-			= new OSCByteArrayToJavaConverter();
-	private OSCPacketDispatcher dispatcher = new OSCPacketDispatcher();
+	private final OSCByteArrayToJavaConverter converter;
+	private final OSCPacketDispatcher dispatcher;
+
+	/**
+	 * Create an OSCPort that listens using a specified socket.
+	 * @param socket DatagramSocket to listen on.
+	 */
+	public OSCPortIn(DatagramSocket socket) {
+		super(socket, socket.getLocalPort());
+
+		this.converter = new OSCByteArrayToJavaConverter();
+		this.dispatcher = new OSCPacketDispatcher();
+	}
 
 	/**
 	 * Create an OSCPort that listens on the specified port.
+	 * Strings will be decoded using the systems default character set.
 	 * @param port UDP port to listen on.
-	 * @throws SocketException
+	 * @throws SocketException if the port number is invalid,
+	 *   or there is already a socket listening on it
 	 */
 	public OSCPortIn(int port) throws SocketException {
-		super(new DatagramSocket(port), port);
+		this(new DatagramSocket(port));
 	}
 
-    /**
-     * Create an OSCPort that listens on the specified port.
-     * @param address UDP socket will bind on.
-     * @param port UDP port to listen on.
-     * @throws SocketException
-     */
-    public OSCPortIn(String address, int port) throws SocketException, UnknownHostException {
-        super(new DatagramSocket(port, InetAddress.getByName(address)), port);
-    }
+	/**
+	 * Create an OSCPort that listens on the specified port,
+	 * and decodes strings with a specific character set.
+	 * @param port UDP port to listen on.
+	 * @param charset how to decode strings read from incoming packages.
+	 *   This includes message addresses and string parameters.
+	 * @throws SocketException if the port number is invalid,
+	 *   or there is already a socket listening on it
+	 */
+	public OSCPortIn(int port, Charset charset) throws SocketException {
+		this(port);
 
+		this.converter.setCharset(charset);
+	}
 
-    /**
+	/**
 	 * Buffers were 1500 bytes in size, but were
 	 * increased to 1536, as this is a common MTU.
 	 */
@@ -98,7 +118,7 @@ public class OSCPortIn extends OSCPort implements Runnable {
 						packet.getLength());
 				dispatcher.dispatchPacket(oscPacket);
 			} catch (IOException e) {
-				e.printStackTrace();
+				e.printStackTrace(); // XXX This may not be a good idea, as this could easily lead to a never ending series of exceptions thrown (due to the non-exited while loop), and because the user of the lib may want to handle this case himself
 			}
 		}
 	}
@@ -109,6 +129,8 @@ public class OSCPortIn extends OSCPort implements Runnable {
 	public void startListening() {
 		listening = true;
 		Thread thread = new Thread(this);
+		// The JVM exits when the only threads running are all daemon threads.
+		thread.setDaemon(true);
 		thread.start();
 	}
 
@@ -121,17 +143,32 @@ public class OSCPortIn extends OSCPort implements Runnable {
 
 	/**
 	 * Am I listening for packets?
+	 * @return true if this port is in listening mode
 	 */
 	public boolean isListening() {
 		return listening;
 	}
 
 	/**
-	 * Register the listener for incoming OSCPackets addressed to an Address
-	 * @param anAddress  the address to listen for. The address can be specified as a regex, e.g., "/m.*e/receiving"
-	 * @param listener   the object to invoke when a message comes in
+	 * Registers a listener that will be notified of incoming messages,
+	 * if their address matches the given pattern.
+	 *
+	 * @param addressSelector either a fixed address like "/sc/mixer/volume",
+	 *   or a selector pattern (a mix between wildcards and regex)
+	 *   like "/??/mixer/*", see {@link OSCPatternAddressSelector} for details
+	 * @param listener will be notified of incoming packets, if they match
 	 */
-	public void addListener(String anAddress, OSCListener listener) {
-		dispatcher.addListener(anAddress, listener);
+	public void addListener(String addressSelector, OSCListener listener) {
+		this.addListener(new OSCPatternAddressSelector(addressSelector), listener);
+	}
+
+	/**
+	 * Registers a listener that will be notified of incoming messages,
+	 * if their address matches the given selector.
+	 * @param addressSelector a custom address selector
+	 * @param listener will be notified of incoming packets, if they match
+	 */
+	public void addListener(AddressSelector addressSelector, OSCListener listener) {
+		dispatcher.addListener(addressSelector, listener);
 	}
 }
